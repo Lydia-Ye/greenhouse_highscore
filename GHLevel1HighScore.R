@@ -12,64 +12,59 @@ library(stringr)
 ##
 # Reading in the greenhouse data
 data.all <- readr::read_csv("https://www.stat2games.sites.grinnell.edu/data/greenhouse/getdata.php") 
-
 # Sort the data based on groups and players
 data.all$GroupID <- tolower(data.all$GroupID)
 all_groups <- sort(unique(data.all$GroupID))
 all_players <- sort(unique(data.all$PlayerID))
 # all_Season <- sort(unique(data.all$Season))
 
-# Calculating the Overall money that a team has by the end of each season using 
-# cumulative sum function cumsum
-data.all <- data.all %>% group_by(GameNum) %>% mutate(OverallProfit = cumsum(Profit)[(length(cumsum(Profit)))])
-data.all <- data.all %>% ungroup()    
-data.all <- data.all %>% mutate(OverallMoney = 5000 + OverallProfit)
-
+data.all <- data.all %>% mutate(OverallMoney = Money)
 # Calculating the Seasonal Profit which is the gains and losses made after 
 # every season.
-data.all <- data.all %>% group_by(GameNum,Season) 
-data.all <- data.all %>% mutate(SeasonalProfit = cumsum(Profit))
 
 
 # Filter out repeating datapoints based on the max number of plots used in 
 # a single season in aa single game.
-data.all <- data.all %>% filter(Plot == max(Plot))
-data.all <- data.all %>% ungroup()
-
-# Restricting to Level 1 Data
-data.all <- data.all %>% filter(Level == 1)
+data.all <- data.all %>%
+  distinct(Season, Level, GameNum, .keep_all = TRUE)
+data.all <- data.all %>%
+  group_by(GameNum) %>%
+  arrange(GameNum) %>%
+  mutate(SeasonalProfit = if_else(Season == 1, 
+                                  OverallMoney - 5000, 
+                                  OverallMoney - lag(OverallMoney, n = 1, order_by = Season)))
 
 
 ui <- fluidPage(
   titlePanel("Level 1: GreenHouse High Scores"),
   fluidRow(
     column(3, 
-      #Table Tab
-      tabPanel("Leaderboard",
-                selectInput(inputId = "GroupID",
-                            label = "Group ID:", 
-                            choices =  c(all_groups),
-                            multiple = TRUE,
-                            selectize = TRUE,
-                            selected = "ekustatsfall21"),
-                selectInput(inputId = "PlayerID",
-                            label = "Player ID:",
-                            choices =  c("all", all_players),
-                            multiple = TRUE,
-                            selectize = TRUE,
-                            selected = "all"),
-                selectInput(inputId = "Season",
-                            label = "Season:",
-                            choices = c("1", "2", "3", "4", "5"),
-                            selected = "1",
-                            multiple = FALSE,
-                            selectize = TRUE),
-                selectInput(inputId = "yvar",
-                            label = "Money",
-                            choices = c("OverallMoney", "SeasonalProfit"),
-                            selected = "OverallMoney",
-                            multiple = FALSE)
-      ) # tabPanel
+           #Table Tab
+           tabPanel("Leaderboard",
+                    selectInput(inputId = "GroupID",
+                                label = "Group ID:", 
+                                choices =  c(all_groups),
+                                multiple = TRUE,
+                                selectize = TRUE,
+                                selected = "ekustatsfall21"),
+                    selectInput(inputId = "PlayerID",
+                                label = "Player ID:",
+                                choices =  c("all", all_players),
+                                multiple = TRUE,
+                                selectize = TRUE,
+                                selected = "all"),
+                    selectInput(inputId = "Season",
+                                label = "Season:",
+                                choices = c("1", "2", "3", "4", "5"),
+                                selected = "1",
+                                multiple = FALSE,
+                                selectize = TRUE),
+                    selectInput(inputId = "yvar",
+                                label = "Money",
+                                choices = c("OverallMoney", "SeasonalProfit"),
+                                selected = "OverallMoney",
+                                multiple = FALSE)
+           ) # tabPanel
     ), # column
     
     column(9, 
@@ -83,37 +78,32 @@ ui <- fluidPage(
 # Define server logic
 server <- function(input, output, session) {
   data.all <- reactive({
-    data.all <- readr::read_csv("https://www.stat2games.sites.grinnell.edu/data/greenhouse/getdata.php")  
-    
-    # Restricting to Level 1 Data
-    data.all <- data.all %>% filter(Level == 1)
-    
+    data.all <- readr::read_csv("https://www.stat2games.sites.grinnell.edu/data/greenhouse/getdata.php") 
     # Sort the data based on groups and players
-    data.all$GroupID <- tolower(data.all$GroupID) # converts all group IDs to lowercase
-    # extract unique group IDs and player IDs 
+    data.all$GroupID <- tolower(data.all$GroupID)
     all_groups <- sort(unique(data.all$GroupID))
     all_players <- sort(unique(data.all$PlayerID))
+    # all_Season <- sort(unique(data.all$Season))
     
-    # Calculating the Overall money that a team has by the end of each season using 
-    # cumulative sum function cumsum
-    #data.all <- data.all %>% group_by(GameNum) %>% mutate(OverallProfit = cumsum(Profit)[(length(cumsum(Profit)))])
-    #data.all <- data.all %>% ungroup()    
-    # data.all <- data.all %>% mutate(OverallMoney = 5000 + OverallProfit)
-    
+    data.all <- data.all %>% mutate(OverallMoney = Money)
     # Calculating the Seasonal Profit which is the gains and losses made after 
     # every season.
-    data.all <- data.all %>% group_by(GameNum, Season)
-    data.all <- data.all %>% mutate(SeasonalProfit = cumsum(Profit))
-    # Calculate the overall money at the end of each season
-    data.all <- data.all %>% mutate(OverallMoney = 5000 + SeasonalProfit[Season])
-
-
     
     
     # Filter out repeating datapoints based on the max number of plots used in 
-    # a single season in a single game.
-    data.all <- data.all %>% filter(Plot == max(Plot))
-    data.all <- data.all %>% ungroup()
+    # a single season in aa single game.
+    data.all <- data.all %>%
+      distinct(Season, Level, GameNum, .keep_all = TRUE)
+    data.all <- data.all %>%
+      group_by(GameNum) %>%
+      arrange(GameNum) %>%
+      mutate(SeasonalProfit = if_else(Season == 1, 
+                                      OverallMoney - 5000, 
+                                      OverallMoney - lag(OverallMoney, n = 1, order_by = Season)))
+  
+    
+    
+    
     
     #Changing to Factor/Character
     data.all$Level <- as.factor(data.all$Level)
